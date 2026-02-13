@@ -1,0 +1,180 @@
+@page "/settings"
+@using NeoHub.Services.Settings
+@using System.Reflection
+@using MudBlazor
+@inject ISettingsDiscoveryService DiscoveryService
+@inject ISettingsPersistenceService PersistenceService
+@inject ISnackbar Snackbar
+
+<PageTitle>Settings</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText Typo="Typo.h4" GutterBottom="true" Class="mt-4">
+        <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+        Application Settings
+    </MudText>
+
+    <MudAlert Severity="Severity.Info" Class="mt-2 mb-4">
+        Settings are saved to <code>userSettings.json</code> and override defaults from <code>appsettings.json</code>
+    </MudAlert>
+
+    @if (!_settingsInstances.Any())
+    {
+        <MudAlert Severity="Severity.Warning">No settings sections discovered</MudAlert>
+    }
+
+    @foreach (var _section in DiscoveryService.DiscoveredSettings)
+    {
+        <MudPaper Elevation="2" Class="pa-4 mt-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">
+                @_section.DisplayName
+            </MudText>
+
+            @if (!string.IsNullOrEmpty(_section.Description))
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-4">@_section.Description</MudAlert>
+            }
+
+            <EditForm Model="@GetSectionSettings(_section)" OnValidSubmit="@(() => SaveSection(_section))">
+                <DataAnnotationsValidator />
+
+                @{
+                    var groupedProperties = _section.Properties.GroupBy(p => p.GroupName ?? "General").ToList();
+                    var hasMultipleGroups = _section.Properties.Select(p => p.GroupName).Distinct().Count() > 1;
+                }
+
+                @foreach (var propGroup in groupedProperties)
+                {
+                    @if (hasMultipleGroups)
+                    {
+                        <MudText Typo="Typo.h6" Class="mt-3 mb-2">@propGroup.Key</MudText>
+                        <MudDivider Class="mb-3" />
+                    }
+
+                    @foreach (var property in propGroup)
+                    {
+                        <div class="mt-3">
+                            @RenderProperty(_section, property)
+                        </div>
+                    }
+                }
+
+                <MudButton ButtonType="ButtonType.Submit"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Class="mt-4"
+                           Disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <MudProgressCircular Class="mr-2" Size="Size.Small" Indeterminate="true" />
+                        <MudText>Saving...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Save @_section.DisplayName</MudText>
+                    }
+                </MudButton>
+            </EditForm>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private Dictionary<Type, object> _settingsInstances = new();
+    private bool _saving = false;
+
+    protected override void OnInitialized()
+    {
+        foreach (var section in DiscoveryService.DiscoveredSettings)
+        {
+            _settingsInstances[section.SettingsType] = PersistenceService.GetSettings(section.SettingsType);
+        }
+    }
+
+    private object GetSectionSettings(SettingsSectionMetadata section)
+    {
+        return _settingsInstances[section.SettingsType];
+    }
+
+    private RenderFragment RenderProperty(SettingsSectionMetadata section, SettingsPropertyMetadata property)
+    {
+        return __builder =>
+        {
+            var settings = GetSectionSettings(section);
+            var propInfo = section.SettingsType.GetProperty(property.PropertyName)!;
+            var currentValue = propInfo.GetValue(settings);
+
+            if (property.PropertyType == typeof(string))
+            {
+                <MudTextField T="string"
+                              Label="@property.DisplayName"
+                              Value="@((string?)currentValue)"
+                              ValueChanged="@((string? value) => propInfo.SetValue(settings, value))"
+                              HelperText="@property.Description"
+                              Variant="Variant.Outlined"
+                              Required="@property.IsRequired"
+                              InputType="@(property.IsSensitive ? InputType.Password : InputType.Text)"
+                              Margin="Margin.Dense" />
+            }
+            else if (property.PropertyType == typeof(int))
+            {
+                <MudNumericField T="int"
+                                 Label="@property.DisplayName"
+                                 Value="@((int)(currentValue ?? 0))"
+                                 ValueChanged="@((int value) => propInfo.SetValue(settings, value))"
+                                 HelperText="@property.Description"
+                                 Variant="Variant.Outlined"
+                                 Margin="Margin.Dense" />
+            }
+            else if (property.PropertyType == typeof(bool))
+            {
+                <div>
+                    <MudSwitch T="bool"
+                               Label="@property.DisplayName"
+                               Checked="@((bool)(currentValue ?? false))"
+                               CheckedChanged="@((bool value) => propInfo.SetValue(settings, value))"
+                               Color="Color.Primary" />
+                    @if (!string.IsNullOrEmpty(property.Description))
+                    {
+                        <div class="mud-input-helper-text">@property.Description</div>
+                    }
+                </div>
+            }
+            else if (property.PropertyType.IsEnum)
+            {
+                <MudSelect T="string"
+                           Label="@property.DisplayName"
+                           Value="@currentValue?.ToString()"
+                           ValueChanged="@((string value) => propInfo.SetValue(settings, Enum.Parse(property.PropertyType, value)))"
+                           HelperText="@property.Description"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           Margin="Margin.Dense">
+                    @foreach (var enumValue in Enum.GetValues(property.PropertyType))
+                    {
+                        <MudSelectItem T="string" Value="@enumValue.ToString()">@enumValue</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+        };
+    }
+
+    private async Task SaveSection(SettingsSectionMetadata section)
+    {
+        _saving = true;
+        try
+        {
+            var settings = GetSectionSettings(section);
+            await PersistenceService.SaveSettingsAsync(section.SettingsType, settings);
+            Snackbar.Add($"{section.DisplayName} saved successfully!", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving {section.DisplayName}: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

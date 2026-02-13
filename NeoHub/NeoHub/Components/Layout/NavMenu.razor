@@ -1,0 +1,26 @@
+﻿@inject NavigationManager Navigation
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">NeoHub</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <MudNavLink Href="/diagnostics" Icon="@Icons.Material.Filled.BugReport">Diagnostics</MudNavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
+        </div>
+    </nav>
+</div>
+

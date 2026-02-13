@@ -1,0 +1,186 @@
+@page "/"
+@using NeoHub.Services
+@using NeoHub.Services.Models
+@using DSC.TLink.ITv2.MediatR
+@inject IPartitionStatusService PartitionService
+@inject IITv2SessionManager SessionManager
+@inject ISessionMonitor SessionMonitor
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Security Panel Status</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">Security Panel Status</MudText>
+
+    @if (!activeSessions.Any())
+    {
+        <MudAlert Severity="Severity.Warning" Class="mt-4">
+            <MudText>No active panel connections. Waiting for panel to connect...</MudText>
+        </MudAlert>
+    }
+    else
+    {
+        <MudSelect T="string" Label="Active Session" @bind-Value="selectedSessionId" Class="mb-4">
+            @foreach (var sessionId in activeSessions)
+            {
+                <MudSelectItem T="string" Value="@sessionId">@sessionId</MudSelectItem>
+            }
+        </MudSelect>
+
+        @if (!string.IsNullOrEmpty(selectedSessionId))
+        {
+            var session = PartitionService.GetSession(selectedSessionId);
+            
+            @if (session == null)
+            {
+                <MudAlert Severity="Severity.Info" Class="mt-4">
+                    <MudText>Waiting for session data...</MudText>
+                </MudAlert>
+            }
+            else
+            {
+                <MudText Typo="Typo.h5" Class="mb-3">Partitions</MudText>
+                <MudGrid Class="mb-6">
+                    @foreach (var (partitionNumber, partition) in session.Partitions.OrderBy(p => p.Key))
+                    {
+                        <MudItem xs="12" lg="6">
+                            <MudCard Elevation="4" Class="mb-4">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h5">Partition @partitionNumber</MudText>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        <MudChip T="string" 
+                                                 Color="@(partition.IsReady ? Color.Success : Color.Warning)" 
+                                                 Size="Size.Small">
+                                            @partition.ArmMode
+                                        </MudChip>
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Zones: @session.Zones.Values.Count(z => z.Partitions.Contains(partitionNumber))
+                                    </MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" 
+                                               Color="Color.Primary" 
+                                               OnClick="@(() => ShowZoneDetails(partitionNumber))">
+                                        View Zones
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+
+                <MudText Typo="Typo.h5" Class="mb-3">All Zones (@session.Zones.Count)</MudText>
+                <MudPaper Class="pa-4">
+                    <MudGrid Spacing="1">
+                        @foreach (var (zoneNumber, zone) in session.Zones.OrderBy(z => z.Key))
+                        {
+                            <MudItem xs="6" sm="4" md="3" lg="2">
+                                <MudTooltip Text="@GetZoneTooltip(zone)">
+                                    <MudChip T="string" 
+                                             Size="Size.Small" 
+                                             Color="@GetZoneColor(zone)"
+                                             Variant="@(zone.IsOpen || zone.IsFaulted || zone.IsTampered ? Variant.Filled : Variant.Outlined)">
+                                        <MudIcon Icon="@GetZoneIcon(zone)" Size="Size.Small" Class="mr-1" />
+                                        Z@zoneNumber
+                                    </MudChip>
+                                </MudTooltip>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private string selectedSessionId = "";
+    private List<string> activeSessions = new();
+
+    protected override void OnInitialized()
+    {
+        RefreshSessions();
+        SessionMonitor.SessionsChanged += OnSessionsChanged;
+        PartitionService.PartitionStateChanged += OnStateChanged;
+        PartitionService.ZoneStateChanged += OnStateChanged;
+    }
+
+    private void OnSessionsChanged()
+    {
+        InvokeAsync(() =>
+        {
+            RefreshSessions();
+            StateHasChanged();
+        });
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshSessions()
+    {
+        activeSessions = SessionManager.GetActiveSessions().ToList();
+        
+        if (string.IsNullOrEmpty(selectedSessionId) || !activeSessions.Contains(selectedSessionId))
+            selectedSessionId = activeSessions.FirstOrDefault() ?? "";
+    }
+
+    private Color GetZoneColor(ZoneState zone)
+    {
+        if (zone.IsTampered) return Color.Error;
+        if (zone.IsFaulted) return Color.Error;
+        if (zone.IsOpen) return Color.Warning;
+        if (zone.IsBypassed) return Color.Info;
+        return Color.Success;
+    }
+
+    private string GetZoneIcon(ZoneState zone)
+    {
+        if (zone.IsTampered) return Icons.Material.Filled.Error;
+        if (zone.IsFaulted) return Icons.Material.Filled.Warning;
+        if (zone.IsOpen) return Icons.Material.Filled.LockOpen;
+        if (zone.IsBypassed) return Icons.Material.Filled.Block;
+        return Icons.Material.Filled.Lock;
+    }
+
+    private string GetZoneTooltip(ZoneState zone)
+    {
+        var status = new List<string>();
+        
+        if (!string.IsNullOrEmpty(zone.ZoneName))
+            status.Add(zone.ZoneName);
+        
+        status.Add(zone.IsOpen ? "OPEN" : "CLOSED");
+        
+        if (zone.IsTampered) status.Add("TAMPERED");
+        if (zone.IsFaulted) status.Add("FAULTED");
+        if (zone.IsBypassed) status.Add("BYPASSED");
+
+        if (zone.Partitions.Any())
+            status.Add($"Partitions: {string.Join(",", zone.Partitions)}");
+        
+        status.Add($"Updated: {zone.LastUpdated.ToLocalTime():HH:mm:ss}");
+        
+        return string.Join(" | ", status);
+    }
+
+    private void ShowZoneDetails(byte partitionNumber)
+    {
+        Navigation.NavigateTo($"/zones/{selectedSessionId}/{partitionNumber}");
+    }
+
+    public void Dispose()
+    {
+        SessionMonitor.SessionsChanged -= OnSessionsChanged;
+        PartitionService.PartitionStateChanged -= OnStateChanged;
+        PartitionService.ZoneStateChanged -= OnStateChanged;
+    }
+}
