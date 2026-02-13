@@ -4,7 +4,6 @@ WORKDIR /src
 
 # Copy project files
 COPY ["NeoHub/NeoHub/NeoHub.csproj", "NeoHub/NeoHub/"]
-COPY ["NeoHub/NeoHub.Client/NeoHub.Client.csproj", "NeoHub/NeoHub.Client/"]
 COPY ["NeoHub/TLink/DSC.TLink.csproj", "NeoHub/TLink/"]
 
 # Restore dependencies
