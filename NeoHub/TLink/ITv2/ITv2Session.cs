@@ -55,7 +55,7 @@ namespace DSC.TLink.ITv2
 
         public string SessionID => _sessionID ?? throw new InvalidOperationException($"Session must be initialized to get property {nameof(SessionID)}");
 
-        public async Task InitializeSession(IDuplexPipe transport, CancellationToken cancellationToken = default)
+        public async Task<bool> InitializeSession(IDuplexPipe transport, CancellationToken cancellationToken = default)
         {
             if (_sessionState != sessionState.Uninitialized)
                 throw new InvalidOperationException("Session must be uninitialized.");
@@ -69,19 +69,24 @@ namespace DSC.TLink.ITv2
 
                 var clientResult = await WaitForClientResultAsync(linkedToken);
 
+                //This ID is [851][422] Integration Identification Number and is part of every message.  I just take it from the first message.
+                _sessionID = Encoding.UTF8.GetString(clientResult.Header);
+
+                _log.LogInformation("Received connection from Integration ID {sessionID}", _sessionID);
+
                 ITv2MessagePacket packet = ParseITv2Message(clientResult.Payload);
 
                 await HandshakeAsync(packet, linkedToken);
 
-                //This ID is [851][422] Integration Identification Number and is part of every message.  I just take it from the first message.
-                _sessionID = Encoding.UTF8.GetString(clientResult.Header);
             }
-            catch
+            catch (Exception ex)
             {
-                _sessionState = sessionState.Closed;                
-                throw;
+                _sessionState = sessionState.Closed;
+                _log.LogError(ex, "Error initializing session");
+                return false;
             }
             _sessionState = sessionState.Connected;
+            return true;
         }
 
         private async Task HandshakeAsync(ITv2MessagePacket messagePacket, CancellationToken cancellation)
@@ -131,7 +136,8 @@ namespace DSC.TLink.ITv2
                     messagePacket = await WaitForMessageAsync(cancellation);
                     if (!await transaction.TryContinueAsync(messagePacket, cancellation))
                     {
-                        throw new Exception("Unable to continue handshake");
+                        _log.LogDebug($"Unable to continue transaction at message {messagePacket.messageData.GetType()}", serializeMessagePacket(messagePacket));
+                        throw new Exception($"Unable to continue handshake");
                     }
                 }
             }
@@ -412,16 +418,20 @@ namespace DSC.TLink.ITv2
         Transaction CreateTransaction(IMessageData messageData) => TransactionFactory.CreateTransaction(messageData, _log, SendTransactionMessageAsync);
         async Task SendTransactionMessageAsync(ITv2MessagePacket message, CancellationToken cancellationToken)
         {
-            var messageBytes = new List<byte>(
-                [message.senderSequence,
-                 message.receiverSequence,
-                 ..message.messageData.Serialize(message.appSequence)
-                ]);
-
+            var messageBytes = serializeMessagePacket(message);
             _log.LogTrace("Sending message (pre encryption) {messageBytes}", messageBytes);
             ITv2Framing.AddFraming(messageBytes);
             var encryptedBytes = _encryptionHandler?.HandleOutboundData(messageBytes.ToArray()) ?? messageBytes.ToArray();
             await _tlinkClient.SendMessageAsync(encryptedBytes, cancellationToken);
+        }
+        List<byte> serializeMessagePacket(ITv2MessagePacket messagePacket)
+        {
+            var messageBytes = new List<byte>(
+                [messagePacket.senderSequence,
+                 messagePacket.receiverSequence,
+                 ..messagePacket.messageData.Serialize(messagePacket.appSequence)
+                ]);
+            return messageBytes;
         }
         void EnsureInboundReceiverSequence(ref ITv2MessagePacket inboundMessagePacket)
         {

@@ -52,7 +52,10 @@ namespace DSC.TLink
                 var sessionManager = scope.ServiceProvider.GetRequiredService<IITv2SessionManager>();
 
                 // Initialize the session
-                await session.InitializeSession(connection.Transport, connection.ConnectionClosed);
+                var sessionConnected = await session.InitializeSession(connection.Transport, connection.ConnectionClosed);
+
+                if (!sessionConnected)
+                    return;
 
                 // Register session for command routing
                 sessionManager.RegisterSession(session.SessionID, session);
