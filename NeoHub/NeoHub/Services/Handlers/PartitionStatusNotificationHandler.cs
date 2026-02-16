@@ -38,15 +38,17 @@ namespace NeoHub.Services.Handlers
             
             partition.IsReady = msg.Status is PartitionReadyStatusEnum.ReadyToArm 
                                             or PartitionReadyStatusEnum.ReadyToForceArm;
-            
-            partition.ArmMode = msg.Status switch
-            {
-                PartitionReadyStatusEnum.ReadyToArm => "Ready",
-                PartitionReadyStatusEnum.ReadyToForceArm => "Ready (Force)",
-                PartitionReadyStatusEnum.NotReadyToArm => "Not Ready",
-                _ => "Unknown"
-            };
-            
+
+            // Any ready-status notification means the partition is disarmed.
+            // This clears stale armed/arming state if the panel cancelled arming
+            // (e.g., door opened during exit delay).
+            partition.Status = PartitionStatus.Disarmed;
+            partition.ExitDelayActive = false;
+            partition.ExitDelayStartedAt = null;
+            partition.ExitDelayDurationSeconds = 0;
+            partition.ExitDelayAudible = false;
+            partition.ExitDelayUrgent = false;
+
             partition.LastUpdated = notification.ReceivedAt;
 
             _service.UpdatePartition(sessionId, partition);

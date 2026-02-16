@@ -31,7 +31,7 @@
                 <MudChip T="string" 
                          Color="@(partition.IsReady ? Color.Success : Color.Warning)" 
                          Size="Size.Medium">
-                    @partition.ArmMode
+                    @partition.EffectiveStatus
                 </MudChip>
             </MudStack>
         </MudPaper>

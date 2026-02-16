@@ -37,18 +37,14 @@ namespace NeoHub.Services.Handlers
             var partition = _service.GetPartition(sessionId, (byte)msg.Partition)
                 ?? new PartitionState { PartitionNumber = (byte)msg.Partition };
 
-            partition.IsArmed = msg.ArmMode != ArmingMode.Disarm;
-            partition.ArmMode = msg.ArmMode switch
+            partition.Status = msg.ArmMode switch
             {
-                ArmingMode.Disarm => "Disarmed",
-                ArmingMode.AwayArm => "Armed Away",
-                ArmingMode.StayArm => "Armed Stay",
-                ArmingMode.NightArm => "Armed Night",
-                ArmingMode.ArmWithNoEntryDelay => "Armed (No Entry Delay)",
-                ArmingMode.StayArmWithNoEntryDelay => "Armed Stay (No Entry Delay)",
-                ArmingMode.AwayArmWithNoEntryDelay => "Armed Away (No Entry Delay)",
-                ArmingMode.NightArmWithNoEntryDelay => "Armed Night (No Entry Delay)",
-                _ => $"Armed ({msg.ArmMode})"
+                ArmingMode.Disarm => PartitionStatus.Disarmed,
+                ArmingMode.AwayArm or ArmingMode.AwayArmWithNoEntryDelay => PartitionStatus.ArmedAway,
+                ArmingMode.StayArm or ArmingMode.StayArmWithNoEntryDelay => PartitionStatus.ArmedHome,
+                ArmingMode.NightArm or ArmingMode.NightArmWithNoEntryDelay => PartitionStatus.ArmedNight,
+                ArmingMode.ArmWithNoEntryDelay => PartitionStatus.ArmedAway,
+                _ => PartitionStatus.ArmedAway
             };
 
             // Clear exit delay state when disarming

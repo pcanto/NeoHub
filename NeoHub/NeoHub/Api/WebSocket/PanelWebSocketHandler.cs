@@ -168,7 +168,7 @@ namespace NeoHub.Api.WebSocket
                             {
                                 PartitionNumber = kvp.Key,
                                 Name = $"Partition {kvp.Key}",
-                                Status = MapPartitionStatus(kvp.Value)
+                                Status = kvp.Value.EffectiveStatus
                             })
                             .ToList(),
                         Zones = zones
@@ -241,7 +241,8 @@ namespace NeoHub.Api.WebSocket
 
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) }
         };
 
         private async Task SendMessageAsync(System.Net.WebSockets.WebSocket webSocket, WebSocketMessage message, string clientId)
@@ -285,13 +286,13 @@ namespace NeoHub.Api.WebSocket
             }
 
             _logger.LogDebug("Broadcasting partition_update: Session={SessionId}, Partition={Partition}, Status={Status}",
-                e.SessionId, e.Partition.PartitionNumber, MapPartitionStatus(e.Partition));
+                e.SessionId, e.Partition.PartitionNumber, e.Partition.EffectiveStatus);
 
             var message = new PartitionUpdateMessage
             {
                 SessionId = e.SessionId,
                 PartitionNumber = e.Partition.PartitionNumber,
-                Status = MapPartitionStatus(e.Partition)
+                Status = e.Partition.EffectiveStatus
             };
 
             _ = BroadcastMessageAsync(message);
@@ -357,34 +358,6 @@ namespace NeoHub.Api.WebSocket
         #endregion
 
         #region Helpers
-
-        private static string MapPartitionStatus(Services.Models.PartitionState partition)
-        {
-            // Check for active exit delay (arming in progress)
-            if (partition.ExitDelayActive && partition.ExitDelayRemaining.HasValue && partition.ExitDelayRemaining.Value > TimeSpan.Zero)
-            {
-                return partition.ArmMode switch
-                {
-                    "Armed Away" or "Armed Away (No Entry Delay)" => "arming_away",
-                    "Armed Stay" or "Armed Stay (No Entry Delay)" => "arming_home",
-                    "Armed Night" or "Armed Night (No Entry Delay)" => "arming_night",
-                    _ => "arming"
-                };
-            }
-
-            if (partition.IsArmed)
-            {
-                return partition.ArmMode switch
-                {
-                    "Armed Away" or "Armed Away (No Entry Delay)" => "armed_away",
-                    "Armed Stay" or "Armed Stay (No Entry Delay)" => "armed_home",
-                    "Armed Night" or "Armed Night (No Entry Delay)" => "armed_night",
-                    _ => "armed_away"
-                };
-            }
-
-            return "disarmed";
-        }
 
         private static string DetermineDeviceClass(Services.Models.ZoneState zone)
         {

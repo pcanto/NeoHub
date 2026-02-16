@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using NeoHub.Services.Models;
 
 namespace NeoHub.Api.WebSocket.Models
 {
@@ -71,7 +72,7 @@ namespace NeoHub.Api.WebSocket.Models
         public required byte PartitionNumber { get; init; }
 
         [JsonPropertyName("status")]
-        public required string Status { get; init; }
+        public required PartitionStatus Status { get; init; }
     }
 
     public record ZoneUpdateMessage : WebSocketMessage
@@ -124,7 +125,7 @@ namespace NeoHub.Api.WebSocket.Models
         public required string Name { get; init; }
 
         [JsonPropertyName("status")]
-        public required string Status { get; init; }
+        public required PartitionStatus Status { get; init; }
     }
 
     public record ZoneDto
