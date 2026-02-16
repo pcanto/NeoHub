@@ -14,7 +14,7 @@ namespace NeoHub.Api.WebSocket
     /// </summary>
     public class PanelWebSocketHandler
     {
-        private readonly IPartitionStatusService _partitionService;
+        private readonly IPanelStateService _panelState;
         private readonly IPanelCommandService _commandService;
         private readonly IITv2SessionManager _sessionManager;
         private readonly ISessionMonitor _sessionMonitor;
@@ -22,13 +22,13 @@ namespace NeoHub.Api.WebSocket
         private readonly ConcurrentBag<System.Net.WebSockets.WebSocket> _connectedClients = new();
 
         public PanelWebSocketHandler(
-            IPartitionStatusService partitionService,
+            IPanelStateService panelState,
             IPanelCommandService commandService,
             IITv2SessionManager sessionManager,
             ISessionMonitor sessionMonitor,
             ILogger<PanelWebSocketHandler> logger)
         {
-            _partitionService = partitionService;
+            _panelState = panelState;
             _commandService = commandService;
             _sessionManager = sessionManager;
             _sessionMonitor = sessionMonitor;
@@ -37,8 +37,8 @@ namespace NeoHub.Api.WebSocket
             _logger.LogInformation("PanelWebSocketHandler initialized. Subscribed to state change events.");
 
             _sessionMonitor.SessionsChanged += OnSessionsChanged;
-            _partitionService.PartitionStateChanged += OnPartitionChanged;
-            _partitionService.ZoneStateChanged += OnZoneChanged;
+            _panelState.PartitionStateChanged += OnPartitionChanged;
+            _panelState.ZoneStateChanged += OnZoneChanged;
         }
 
         public async Task HandleConnectionAsync(HttpContext context)
@@ -156,8 +156,8 @@ namespace NeoHub.Api.WebSocket
                 .Where(sessionId => !string.IsNullOrWhiteSpace(sessionId))
                 .Select(sessionId =>
                 {
-                    var partitions = _partitionService.GetPartitions(sessionId);
-                    var zones = _partitionService.GetZones(sessionId);
+                    var partitions = _panelState.GetPartitions(sessionId);
+                    var zones = _panelState.GetZones(sessionId);
 
                     return new SessionDto
                     {

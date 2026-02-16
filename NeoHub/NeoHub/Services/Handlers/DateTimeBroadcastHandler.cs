@@ -10,11 +10,11 @@ namespace NeoHub.Services.Handlers
     public class DateTimeBroadcastHandler
         : INotificationHandler<SessionNotification<NotificationDateTimeBroadcast>>
     {
-        private readonly IPartitionStatusService _service;
+        private readonly IPanelStateService _service;
         private readonly ILogger<DateTimeBroadcastHandler> _logger;
 
         public DateTimeBroadcastHandler(
-            IPartitionStatusService service,
+            IPanelStateService service,
             ILogger<DateTimeBroadcastHandler> logger)
         {
             _service = service;

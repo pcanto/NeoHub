@@ -11,11 +11,11 @@ namespace NeoHub.Services.Handlers
     public class ZoneStatusNotificationHandler 
         : INotificationHandler<SessionNotification<NotificationLifestyleZoneStatus>>
     {
-        private readonly IPartitionStatusService _service;
+        private readonly IPanelStateService _service;
         private readonly ILogger<ZoneStatusNotificationHandler> _logger;
 
         public ZoneStatusNotificationHandler(
-            IPartitionStatusService service,
+            IPanelStateService service,
             ILogger<ZoneStatusNotificationHandler> logger)
         {
             _service = service;

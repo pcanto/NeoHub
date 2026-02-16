@@ -3,16 +3,16 @@ using NeoHub.Services.Models;
 
 namespace NeoHub.Services
 {
-    public class PartitionStatusService : IPartitionStatusService
+    public class PanelStateService : IPanelStateService
     {
         private readonly ConcurrentDictionary<string, SessionState> _sessions = new();
-        private readonly ILogger<PartitionStatusService> _logger;
+        private readonly ILogger<PanelStateService> _logger;
 
         public event EventHandler<SessionStateChangedEventArgs>? SessionStateChanged;
         public event EventHandler<PartitionStateChangedEventArgs>? PartitionStateChanged;
         public event EventHandler<ZoneStateChangedEventArgs>? ZoneStateChanged;
 
-        public PartitionStatusService(ILogger<PartitionStatusService> logger)
+        public PanelStateService(ILogger<PanelStateService> logger)
         {
             _logger = logger;
         }

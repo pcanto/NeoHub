@@ -3,7 +3,7 @@
 @using NeoHub.Services.Models
 @using DSC.TLink.ITv2.Enumerations
 @using DSC.TLink.ITv2.MediatR
-@inject IPartitionStatusService PartitionService
+@inject IPanelStateService PanelState
 @inject IPanelCommandService CommandService
 @inject IITv2SessionManager SessionManager
 @inject ISessionMonitor SessionMonitor
@@ -33,7 +33,7 @@
 
         @if (!string.IsNullOrEmpty(selectedSessionId))
         {
-            var session = PartitionService.GetSession(selectedSessionId);
+            var session = PanelState.GetSession(selectedSessionId);
 
             @if (session == null)
             {
@@ -187,9 +187,9 @@
     {
         RefreshSessions();
         SessionMonitor.SessionsChanged += OnSessionsChanged;
-        PartitionService.SessionStateChanged += OnStateChanged;
-        PartitionService.PartitionStateChanged += OnStateChanged;
-        PartitionService.ZoneStateChanged += OnStateChanged;
+        PanelState.SessionStateChanged += OnStateChanged;
+        PanelState.PartitionStateChanged += OnStateChanged;
+        PanelState.ZoneStateChanged += OnStateChanged;
 
         _clockTimer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
@@ -319,8 +319,8 @@
     {
         _clockTimer?.Dispose();
         SessionMonitor.SessionsChanged -= OnSessionsChanged;
-        PartitionService.SessionStateChanged -= OnStateChanged;
-        PartitionService.PartitionStateChanged -= OnStateChanged;
-        PartitionService.ZoneStateChanged -= OnStateChanged;
+        PanelState.SessionStateChanged -= OnStateChanged;
+        PanelState.PartitionStateChanged -= OnStateChanged;
+        PanelState.ZoneStateChanged -= OnStateChanged;
     }
 }

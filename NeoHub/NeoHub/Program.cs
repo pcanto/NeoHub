@@ -57,7 +57,7 @@ namespace NeoHub
                 typeof(StartupExtensions).Assembly));
 
             // Application services
-            builder.Services.AddSingleton<IPartitionStatusService, PartitionStatusService>();
+            builder.Services.AddSingleton<IPanelStateService, PanelStateService>();
             builder.Services.AddSingleton<IPanelCommandService, PanelCommandService>();
             builder.Services.AddSingleton<ISessionMonitor, SessionMonitor>();
 

@@ -12,11 +12,11 @@ namespace NeoHub.Services.Handlers
     public class PartitionStatusNotificationHandler 
         : INotificationHandler<SessionNotification<NotificationPartitionReadyStatus>>
     {
-        private readonly IPartitionStatusService _service;
+        private readonly IPanelStateService _service;
         private readonly ILogger<PartitionStatusNotificationHandler> _logger;
 
         public PartitionStatusNotificationHandler(
-            IPartitionStatusService service,
+            IPanelStateService service,
             ILogger<PartitionStatusNotificationHandler> logger)
         {
             _service = service;
@@ -30,8 +30,7 @@ namespace NeoHub.Services.Handlers
             var msg = notification.MessageData;
             var sessionId = notification.SessionId;
 
-            _logger.LogInformation(
-                "Partition {Partition} status: {Status} (Session: {SessionId})",
+            _logger.LogDebug("Partition {Partition} status: {Status} (Session: {SessionId})",
                 msg.PartitionNumber, msg.Status, sessionId);
 
             var partition = _service.GetPartition(sessionId, msg.PartitionNumber) 

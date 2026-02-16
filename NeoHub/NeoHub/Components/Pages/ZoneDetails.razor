@@ -1,7 +1,7 @@
 @page "/zones/{SessionId}/{PartitionNumber:int}"
 @using NeoHub.Services
 @using NeoHub.Services.Models
-@inject IPartitionStatusService PartitionService
+@inject IPanelStateService PanelState
 @inject NavigationManager Navigation
 @implements IDisposable
 
@@ -132,14 +132,14 @@
         };
 
         LoadData();
-        PartitionService.PartitionStateChanged += OnStateChanged;
-        PartitionService.ZoneStateChanged += OnStateChanged;
+        PanelState.PartitionStateChanged += OnStateChanged;
+        PanelState.ZoneStateChanged += OnStateChanged;
     }
 
     private void LoadData()
     {
-        session = PartitionService.GetSession(SessionId);
-        partition = PartitionService.GetPartition(SessionId, (byte)PartitionNumber);
+        session = PanelState.GetSession(SessionId);
+        partition = PanelState.GetPartition(SessionId, (byte)PartitionNumber);
 
         if (session != null)
         {
@@ -180,7 +180,7 @@
 
     public void Dispose()
     {
-        PartitionService.PartitionStateChanged -= OnStateChanged;
-        PartitionService.ZoneStateChanged -= OnStateChanged;
+        PanelState.PartitionStateChanged -= OnStateChanged;
+        PanelState.ZoneStateChanged -= OnStateChanged;
     }
 }

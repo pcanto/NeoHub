@@ -2,7 +2,7 @@ using NeoHub.Services.Models;
 
 namespace NeoHub.Services
 {
-    public interface IPartitionStatusService
+    public interface IPanelStateService
     {
         // Session operations
         SessionState? GetSession(string sessionId);

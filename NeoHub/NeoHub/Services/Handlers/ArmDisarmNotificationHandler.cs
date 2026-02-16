@@ -12,11 +12,11 @@ namespace NeoHub.Services.Handlers
     public class ArmDisarmNotificationHandler
         : INotificationHandler<SessionNotification<NotificationArmDisarm>>
     {
-        private readonly IPartitionStatusService _service;
+        private readonly IPanelStateService _service;
         private readonly ILogger<ArmDisarmNotificationHandler> _logger;
 
         public ArmDisarmNotificationHandler(
-            IPartitionStatusService service,
+            IPanelStateService service,
             ILogger<ArmDisarmNotificationHandler> logger)
         {
             _service = service;
