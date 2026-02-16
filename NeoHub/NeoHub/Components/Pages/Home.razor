@@ -65,10 +65,16 @@
                                         <MudText Typo="Typo.h5">Partition @partitionNumber</MudText>
                                     </CardHeaderContent>
                                     <CardHeaderActions>
+                                        @{
+                                            var isArming = partition.ExitDelayActive && partition.ExitDelayRemaining.HasValue && partition.ExitDelayRemaining.Value > TimeSpan.Zero;
+                                            var displayMode = GetPartitionDisplayMode(partition);
+                                            var chipColor = GetPartitionChipColor(partition, isArming);
+                                        }
                                         <MudChip T="string" 
-                                                 Color="@(partition.IsArmed ? Color.Error : partition.IsReady ? Color.Success : Color.Warning)" 
-                                                 Size="Size.Small">
-                                            @partition.ArmMode
+                                                 Color="@chipColor" 
+                                                 Size="Size.Small"
+                                                 Style="@(isArming ? "animation: pulse 1s infinite;" : "")">
+                                            @displayMode
                                         </MudChip>
                                     </CardHeaderActions>
                                 </MudCardHeader>
@@ -310,6 +316,40 @@
     private void ShowZoneDetails(byte partitionNumber)
     {
         Navigation.NavigateTo($"/zones/{selectedSessionId}/{partitionNumber}");
+    }
+
+    private string GetPartitionDisplayMode(PartitionState partition)
+    {
+        var isArming = partition.ExitDelayActive && partition.ExitDelayRemaining.HasValue && partition.ExitDelayRemaining.Value > TimeSpan.Zero;
+
+        if (isArming)
+        {
+            // Show "Arming" status during exit delay
+            return partition.ArmMode switch
+            {
+                "Armed Away" or "Armed Away (No Entry Delay)" => "Arming Away",
+                "Armed Stay" or "Armed Stay (No Entry Delay)" => "Arming Stay",
+                "Armed Night" or "Armed Night (No Entry Delay)" => "Arming Night",
+                _ when partition.ArmMode.StartsWith("Armed") => "Arming",
+                _ => partition.ArmMode
+            };
+        }
+
+        return partition.ArmMode;
+    }
+
+    private Color GetPartitionChipColor(PartitionState partition, bool isArming)
+    {
+        if (isArming)
+            return Color.Warning; // Yellow/orange while arming
+
+        if (partition.IsArmed)
+            return Color.Error; // Red when fully armed
+
+        if (partition.IsReady)
+            return Color.Success; // Green when ready
+
+        return Color.Warning; // Yellow when not ready
     }
 
     private async Task ArmPartitionAsync(byte partition, ArmingMode mode)

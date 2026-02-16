@@ -51,6 +51,16 @@ namespace NeoHub.Services.Handlers
                 _ => $"Armed ({msg.ArmMode})"
             };
 
+            // Clear exit delay state when disarming
+            if (msg.ArmMode == ArmingMode.Disarm)
+            {
+                partition.ExitDelayActive = false;
+                partition.ExitDelayStartedAt = null;
+                partition.ExitDelayDurationSeconds = 0;
+                partition.ExitDelayAudible = false;
+                partition.ExitDelayUrgent = false;
+            }
+
             partition.LastUpdated = notification.ReceivedAt;
 
             _service.UpdatePartition(sessionId, partition);

@@ -360,6 +360,18 @@ namespace NeoHub.Api.WebSocket
 
         private static string MapPartitionStatus(Services.Models.PartitionState partition)
         {
+            // Check for active exit delay (arming in progress)
+            if (partition.ExitDelayActive && partition.ExitDelayRemaining.HasValue && partition.ExitDelayRemaining.Value > TimeSpan.Zero)
+            {
+                return partition.ArmMode switch
+                {
+                    "Armed Away" or "Armed Away (No Entry Delay)" => "arming_away",
+                    "Armed Stay" or "Armed Stay (No Entry Delay)" => "arming_home",
+                    "Armed Night" or "Armed Night (No Entry Delay)" => "arming_night",
+                    _ => "arming"
+                };
+            }
+
             if (partition.IsArmed)
             {
                 return partition.ArmMode switch

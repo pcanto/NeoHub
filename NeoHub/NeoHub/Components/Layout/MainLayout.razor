@@ -1,4 +1,12 @@
 ﻿@inherits LayoutComponentBase
+@using NeoHub.Services
+@using NeoHub.Services.Models
+@using DSC.TLink.ITv2.MediatR
+@using Microsoft.JSInterop
+@inject IPanelStateService PanelState
+@inject IITv2SessionManager SessionManager
+@inject IJSRuntime JS
+@implements IDisposable
 
 <!-- ✅ Add MudBlazor Providers -->
 <MudThemeProvider />
@@ -6,7 +14,56 @@
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<div class="page">
+@* Exit Delay Banner - Fixed position at top, above all content *@
+@{
+    var allSessions = SessionManager.GetActiveSessions();
+    var activeDelays = allSessions
+        .SelectMany(sessionId =>
+        {
+            var session = PanelState.GetSession(sessionId);
+            return session?.Partitions.Values
+                .Where(p => p.ExitDelayActive && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero)
+                .Select(p => new { SessionId = sessionId, Partition = p })
+                ?? Enumerable.Empty<dynamic>();
+        })
+        .OrderBy(item => ((PartitionState)item.Partition).ExitDelayRemaining) // Shortest duration first
+        .ToList();
+}
+
+@for (int i = 0; i < activeDelays.Count; i++)
+{
+    var item = activeDelays[i];
+    var partition = item.Partition as PartitionState;
+    var sessionId = item.SessionId as string;
+    var remaining = partition!.ExitDelayRemaining!.Value;
+    var severity = partition.ExitDelayUrgent ? Severity.Error : Severity.Warning;
+    var icon = partition.ExitDelayUrgent ? Icons.Material.Filled.Warning : Icons.Material.Filled.Timer;
+    // Shortest delay (index 0) gets highest z-index
+    var zIndex = 9999 + (activeDelays.Count - i);
+
+    <MudAlert Severity="@severity"
+              Variant="Variant.Filled"
+              Class="exit-delay-banner"
+              Style="@($"z-index: {zIndex};")"
+              Icon="@icon">
+        <div class="exit-delay-content">
+            <MudText Typo="Typo.body2" Class="exit-delay-label">
+                <strong>P@(partition.PartitionNumber) Exit Delay</strong>
+            </MudText>
+            <MudText Typo="Typo.h4" Class="exit-delay-timer">
+                @remaining.ToString(@"mm\:ss")
+            </MudText>
+            @if (partition.ExitDelayUrgent)
+            {
+                <MudText Typo="Typo.body2" Class="exit-delay-urgent">
+                    URGENT
+                </MudText>
+            }
+        </div>
+    </MudAlert>
+}
+
+<div class="page @(activeDelays.Any() ? "exit-delay-active" : "")">
     <div class="sidebar">
         <NavMenu />
     </div>
@@ -27,3 +84,89 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    private Timer? _refreshTimer;
+    private bool _isBeeping = false;
+
+    protected override void OnInitialized()
+    {
+        PanelState.PartitionStateChanged += OnPartitionStateChanged;
+
+        // Refresh UI every second for countdown and audio management
+        _refreshTimer = new Timer(_ => InvokeAsync(async () =>
+        {
+            var hasActiveDelay = HasActiveExitDelay();
+            await UpdateExitDelayBeepAsync(hasActiveDelay);
+
+            if (hasActiveDelay)
+                StateHasChanged();
+        }), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private void OnPartitionStateChanged(object? sender, PartitionStateChangedEventArgs e)
+    {
+        InvokeAsync(async () =>
+        {
+            await UpdateExitDelayBeepAsync(HasActiveExitDelay());
+            StateHasChanged();
+        });
+    }
+
+    private bool HasActiveExitDelay()
+    {
+        return SessionManager.GetActiveSessions()
+            .SelectMany(sessionId =>
+            {
+                var session = PanelState.GetSession(sessionId);
+                return session?.Partitions.Values ?? Enumerable.Empty<PartitionState>();
+            })
+            .Any(p => p.ExitDelayActive && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero);
+    }
+
+    private async Task UpdateExitDelayBeepAsync(bool hasActiveDelay)
+    {
+        var hasAudibleDelay = hasActiveDelay && SessionManager.GetActiveSessions()
+            .SelectMany(sessionId =>
+            {
+                var session = PanelState.GetSession(sessionId);
+                return session?.Partitions.Values ?? Enumerable.Empty<PartitionState>();
+            })
+            .Any(p => p.ExitDelayActive && p.ExitDelayAudible && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero);
+
+        if (hasAudibleDelay && !_isBeeping)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("exitDelayBeep.startBeeping");
+                _isBeeping = true;
+            }
+            catch { }
+        }
+        else if (!hasAudibleDelay && _isBeeping)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("exitDelayBeep.stopBeeping");
+                _isBeeping = false;
+            }
+            catch { }
+        }
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+
+        if (_isBeeping)
+        {
+            try
+            {
+                JS.InvokeVoidAsync("exitDelayBeep.stopBeeping");
+            }
+            catch { }
+        }
+
+        PanelState.PartitionStateChanged -= OnPartitionStateChanged;
+    }
+}

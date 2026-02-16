@@ -49,3 +49,57 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+/* Exit delay blink animation */
+@keyframes blink {
+    0%, 49% {
+        opacity: 1;
+    }
+    50%, 100% {
+        opacity: 0.3;
+    }
+}
+
+/* Exit delay banner */
+.exit-delay-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-radius: 0 !important;
+    margin: 0;
+}
+
+.exit-delay-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: nowrap;
+}
+
+.exit-delay-timer {
+    font-family: monospace;
+    font-weight: bold;
+}
+
+.exit-delay-urgent {
+    animation: blink 1s infinite;
+    font-weight: bold;
+}
+
+.exit-delay-active {
+    margin-top: 52px;
+}
+
+/* Partition arming pulse animation */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
+}
