@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+using DSC.TLink.Extensions;
 using System.ComponentModel;
 
 namespace DSC.TLink.ITv2.Enumerations
@@ -71,4 +72,8 @@ namespace DSC.TLink.ITv2.Enumerations
 		[Description("Invalid Trouble Type")]
 		InvalidTroubleType = 29
 	}
+    internal static class CommandResponseCodeExtensions
+    {
+        public static string Description(this CommandResponseCode responseCode) => EnumExtensions.GetMemberDescription(responseCode);
+    }
 }

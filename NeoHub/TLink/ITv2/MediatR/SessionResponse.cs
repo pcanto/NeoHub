@@ -15,5 +15,6 @@ namespace DSC.TLink.ITv2.MediatR
         public bool Success { get; init; }
         public IMessageData? MessageData { get; init; }
         public string? ErrorMessage { get; init; }
+        public string? ErrorDetail { get; init; }
     }
 }

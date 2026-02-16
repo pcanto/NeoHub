@@ -1,4 +1,6 @@
-﻿using DSC.TLink.ITv2.Messages;
+﻿using DSC.TLink.Extensions;
+using DSC.TLink.ITv2.Enumerations;
+using DSC.TLink.ITv2.Messages;
 using DSC.TLink.ITv2.Transactions;
 using MediatR;
 using Microsoft.Extensions.Logging;
@@ -52,8 +54,13 @@ namespace DSC.TLink.ITv2.MediatR
                 return new SessionResponse
                 {
                     Success = result.Success,
-                    MessageData = result.MessageData as IMessageData,
-                    ErrorMessage = result.ErrorMessage
+                    MessageData = result.MessageData,
+                    ErrorMessage = result.ErrorMessage,
+                    ErrorDetail = result.MessageData switch
+                    {
+                        CommandResponse cmdresp => $"Command Response Code: {cmdresp.ResponseCode.Description()}",
+                        _ => null
+                    }
                 };
             }
             catch (Exception ex)

@@ -20,11 +20,11 @@ using DSC.TLink.Serialization;
 
 namespace DSC.TLink.ITv2.Messages
 {
-	[ITv2Command(ITv2Command.ModuleControl_Partition_Arm_Control)]
-	[CommandResponseTransaction]
+	[ITv2Command(ITv2Command.ModuleControl_Partition_Arm_Control, isAppSequence: true)]
+	[SimpleAckTransaction]
 	public record PartitionArm : IMessageData
 	{
-		[CompactInteger]
+        [CompactInteger]
 		public int Partition { get; init; }
 		public ArmingMode ArmMode { get; init; }
 		[BCDString]

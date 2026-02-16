@@ -148,7 +148,7 @@
     }
 </MudContainer>
 
-<MudDialog @bind-Visible="showDisarmDialog">
+<MudDialog @bind-Visible="showDisarmDialog" MaxWidth="MaxWidth.Small">
     <TitleContent>
         <MudText Typo="Typo.h6">
             <MudIcon Icon="@Icons.Material.Filled.LockOpen" Class="mr-2" />
@@ -161,7 +161,55 @@
                       InputType="InputType.Password"
                       Immediate="true"
                       Variant="Variant.Outlined"
-                      Class="mt-2" />
+                      ReadOnly="true"
+                      Class="mt-2 mb-4" />
+
+        <MudGrid Spacing="2">
+            @for (int i = 1; i <= 9; i++)
+            {
+                var digit = i;
+                <MudItem xs="4">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Size="Size.Large"
+                               OnClick="@(() => AddDigit(digit.ToString()))"
+                               Style="height: 60px; font-size: 1.5rem;">
+                        @digit
+                    </MudButton>
+                </MudItem>
+            }
+            <MudItem xs="4">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Secondary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="ClearCode"
+                           Style="height: 60px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Clear" />
+                </MudButton>
+            </MudItem>
+            <MudItem xs="4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="@(() => AddDigit("0"))"
+                           Style="height: 60px; font-size: 1.5rem;">
+                    0
+                </MudButton>
+            </MudItem>
+            <MudItem xs="4">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Warning"
+                           FullWidth="true"
+                           Size="Size.Large"
+                           OnClick="Backspace"
+                           Style="height: 60px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Backspace" />
+                </MudButton>
+            </MudItem>
+        </MudGrid>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => showDisarmDialog = false)">Cancel</MudButton>
@@ -285,6 +333,22 @@
         disarmPartition = partition;
         disarmCode = "";
         showDisarmDialog = true;
+    }
+
+    private void AddDigit(string digit)
+    {
+        disarmCode += digit;
+    }
+
+    private void Backspace()
+    {
+        if (!string.IsNullOrEmpty(disarmCode))
+            disarmCode = disarmCode[..^1];
+    }
+
+    private void ClearCode()
+    {
+        disarmCode = "";
     }
 
     private async Task DisarmPartitionAsync()

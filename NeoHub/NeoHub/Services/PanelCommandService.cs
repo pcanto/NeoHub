@@ -21,7 +21,6 @@ namespace NeoHub.Services
             _logger.LogInformation(
                 "Arm command: Session={SessionId}, Partition={Partition}, Mode={Mode}",
                 sessionId, partition, mode);
-
             var message = new PartitionArm
             {
                 Partition = partition,
@@ -51,7 +50,7 @@ namespace NeoHub.Services
         {
             try
             {
-                var response = await _mediator.Send(new SessionCommand
+                SessionResponse response = await _mediator.Send(new SessionCommand
                 {
                     SessionID = sessionId,
                     MessageData = message
@@ -60,8 +59,9 @@ namespace NeoHub.Services
                 if (response.Success)
                     return PanelCommandResult.Ok();
 
-                _logger.LogWarning("Command failed: {Error}", response.ErrorMessage);
-                return PanelCommandResult.Error(response.ErrorMessage ?? "Unknown error");
+                _logger.LogWarning("Command failed: {Error} {detail}", response.ErrorMessage, response.ErrorDetail);
+                string errorMessage = response.ErrorDetail ?? response.ErrorMessage ?? "Unknown error";
+                return PanelCommandResult.Error(errorMessage);
             }
             catch (Exception ex)
             {

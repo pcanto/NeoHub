@@ -28,7 +28,7 @@ namespace DSC.TLink.Extensions
 		}
 		public static string GetMemberDescription(Enum enumeration)
 		{
-			string enumerationString = enumeration.ToString();
+            string enumerationString = enumeration.ToString();
 			var member = enumeration.GetType().GetMember(enumerationString).First();
 			var attribute = member.GetCustomAttributes(typeof(DescriptionAttribute), false).FirstOrDefault();
 			return (attribute as DescriptionAttribute)?.Description ?? enumerationString;

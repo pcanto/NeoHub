@@ -105,7 +105,13 @@ namespace DSC.TLink.ITv2.Transactions
         {
             log.LogWarning("Received unexpected message during {TransactionType}: {MessageType}", GetType().Name, message.messageData.GetType().Name);
             Abort("Unexpected response");
-            return false;
+
+            return message.messageData switch
+            {
+                SimpleAck => true,
+                CommandResponse => true,
+                _ => false
+            };
         }
         /// <summary>
         /// Abort the transaction

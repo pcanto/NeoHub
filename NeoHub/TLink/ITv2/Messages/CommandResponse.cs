@@ -22,6 +22,7 @@ using DSC.TLink.Serialization;
 namespace DSC.TLink.ITv2.Messages
 {
 	[ITv2Command(ITv2Command.Command_Response, isAppSequence: true)]
+    [SimpleAckTransaction]
 	internal record CommandResponse : IMessageData
 	{
         public CommandResponseCode ResponseCode { get; init; }

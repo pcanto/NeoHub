@@ -20,8 +20,8 @@ using DSC.TLink.Serialization;
 
 namespace DSC.TLink.ITv2.Messages
 {
-    [ITv2Command(ITv2Command.ModuleControl_Partition_Disarm_Control)]
-    [CommandResponseTransaction]
+    [ITv2Command(ITv2Command.ModuleControl_Partition_Disarm_Control, isAppSequence: true)]
+    [SimpleAckTransaction]
     public record PartitionDisarm : IMessageData
 	{
         [CompactInteger]
