@@ -23,6 +23,7 @@ namespace DSC.TLink.Serialization
         {
             new MultipleMessagePacketSerializer(), // Most specific handler
             new CompactIntegerSerializer(),        // Add before ObjectArraySerializer
+            new StringSerializer(),
             new ObjectArraySerializer(),
             new ByteArraySerializer(),
             new DateTimeSerializer(),

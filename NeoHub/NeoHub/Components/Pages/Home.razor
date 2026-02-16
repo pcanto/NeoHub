@@ -1,11 +1,14 @@
 @page "/"
 @using NeoHub.Services
 @using NeoHub.Services.Models
+@using DSC.TLink.ITv2.Enumerations
 @using DSC.TLink.ITv2.MediatR
 @inject IPartitionStatusService PartitionService
+@inject IPanelCommandService CommandService
 @inject IITv2SessionManager SessionManager
 @inject ISessionMonitor SessionMonitor
 @inject NavigationManager Navigation
+@inject ISnackbar Snackbar
 @implements IDisposable
 
 <PageTitle>Security Panel Status</PageTitle>
@@ -31,7 +34,7 @@
         @if (!string.IsNullOrEmpty(selectedSessionId))
         {
             var session = PartitionService.GetSession(selectedSessionId);
-            
+
             @if (session == null)
             {
                 <MudAlert Severity="Severity.Info" Class="mt-4">
@@ -40,6 +43,13 @@
             }
             else
             {
+                @if (session.PanelDateTimeNow is DateTime panelTime)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" Style="vertical-align: middle;" />
+                        Panel Time: @panelTime.ToString("F")
+                    </MudText>
+                }
                 <MudText Typo="Typo.h5" Class="mb-3">Partitions</MudText>
                 <MudGrid Class="mb-6">
                     @foreach (var (partitionNumber, partition) in session.Partitions.OrderBy(p => p.Key))
@@ -52,7 +62,7 @@
                                     </CardHeaderContent>
                                     <CardHeaderActions>
                                         <MudChip T="string" 
-                                                 Color="@(partition.IsReady ? Color.Success : Color.Warning)" 
+                                                 Color="@(partition.IsArmed ? Color.Error : partition.IsReady ? Color.Success : Color.Warning)" 
                                                  Size="Size.Small">
                                             @partition.ArmMode
                                         </MudChip>
@@ -64,6 +74,45 @@
                                     </MudText>
                                 </MudCardContent>
                                 <MudCardActions>
+                                    @if (partition.IsArmed)
+                                    {
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Success"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.LockOpen"
+                                                   OnClick="@(() => ShowDisarmDialog(partitionNumber))"
+                                                   Disabled="@commandInProgress">
+                                            Disarm
+                                        </MudButton>
+                                    }
+                                    else
+                                    {
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.Lock"
+                                                   OnClick="@(() => ArmPartitionAsync(partitionNumber, ArmingMode.AwayArm))"
+                                                   Disabled="@(!partition.IsReady || commandInProgress)">
+                                            Away
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Warning"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.Home"
+                                                   OnClick="@(() => ArmPartitionAsync(partitionNumber, ArmingMode.StayArm))"
+                                                   Disabled="@(!partition.IsReady || commandInProgress)">
+                                            Stay
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Dark"
+                                                   Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.NightsStay"
+                                                   OnClick="@(() => ArmPartitionAsync(partitionNumber, ArmingMode.NightArm))"
+                                                   Disabled="@(!partition.IsReady || commandInProgress)">
+                                            Night
+                                        </MudButton>
+                                    }
+                                    <MudSpacer />
                                     <MudButton Variant="Variant.Text" 
                                                Color="Color.Primary" 
                                                OnClick="@(() => ShowZoneDetails(partitionNumber))">
@@ -99,16 +148,50 @@
     }
 </MudContainer>
 
+<MudDialog @bind-Visible="showDisarmDialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.LockOpen" Class="mr-2" />
+            Disarm Partition @disarmPartition
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="disarmCode"
+                      Label="Access Code"
+                      InputType="InputType.Password"
+                      Immediate="true"
+                      Variant="Variant.Outlined"
+                      Class="mt-2" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showDisarmDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success"
+                   Variant="Variant.Filled"
+                   OnClick="DisarmPartitionAsync"
+                   Disabled="@(string.IsNullOrEmpty(disarmCode))">
+            Disarm
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private string selectedSessionId = "";
     private List<string> activeSessions = new();
+    private bool commandInProgress;
+    private string disarmCode = "";
+    private byte? disarmPartition;
+    private bool showDisarmDialog;
+    private Timer? _clockTimer;
 
     protected override void OnInitialized()
     {
         RefreshSessions();
         SessionMonitor.SessionsChanged += OnSessionsChanged;
+        PartitionService.SessionStateChanged += OnStateChanged;
         PartitionService.PartitionStateChanged += OnStateChanged;
         PartitionService.ZoneStateChanged += OnStateChanged;
+
+        _clockTimer = new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
     private void OnSessionsChanged()
@@ -177,9 +260,66 @@
         Navigation.NavigateTo($"/zones/{selectedSessionId}/{partitionNumber}");
     }
 
+    private async Task ArmPartitionAsync(byte partition, ArmingMode mode)
+    {
+        if (string.IsNullOrEmpty(selectedSessionId)) return;
+
+        commandInProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await CommandService.ArmAsync(selectedSessionId, partition, mode);
+            if (!result.Success)
+                Snackbar.Add($"Arm failed: {result.ErrorMessage}", Severity.Error);
+        }
+        finally
+        {
+            commandInProgress = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowDisarmDialog(byte partition)
+    {
+        disarmPartition = partition;
+        disarmCode = "";
+        showDisarmDialog = true;
+    }
+
+    private async Task DisarmPartitionAsync()
+    {
+        if (string.IsNullOrEmpty(selectedSessionId) || !disarmPartition.HasValue) return;
+        if (string.IsNullOrEmpty(disarmCode))
+        {
+            Snackbar.Add("Access code is required", Severity.Warning);
+            return;
+        }
+
+        showDisarmDialog = false;
+        commandInProgress = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await CommandService.DisarmAsync(selectedSessionId, disarmPartition.Value, disarmCode);
+            if (!result.Success)
+                Snackbar.Add($"Disarm failed: {result.ErrorMessage}", Severity.Error);
+        }
+        finally
+        {
+            commandInProgress = false;
+            disarmCode = "";
+            disarmPartition = null;
+            StateHasChanged();
+        }
+    }
+
     public void Dispose()
     {
+        _clockTimer?.Dispose();
         SessionMonitor.SessionsChanged -= OnSessionsChanged;
+        PartitionService.SessionStateChanged -= OnStateChanged;
         PartitionService.PartitionStateChanged -= OnStateChanged;
         PartitionService.ZoneStateChanged -= OnStateChanged;
     }

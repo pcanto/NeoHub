@@ -18,12 +18,16 @@ using DSC.TLink.ITv2.Enumerations;
 using DSC.TLink.ITv2.Transactions;
 using DSC.TLink.Serialization;
 
-
 namespace DSC.TLink.ITv2.Messages
 {
-	[ITv2Command(ITv2Command.Command_Response, isAppSequence: true)]
-	internal record CommandResponse : IMessageData
+	[ITv2Command(ITv2Command.ModuleControl_Partition_Arm_Control)]
+	[CommandResponseTransaction]
+	public record PartitionArm : IMessageData
 	{
-        public CommandResponseCode ResponseCode { get; init; }
+		[CompactInteger]
+		public int Partition { get; init; }
+		public ArmingMode ArmMode { get; init; }
+		[BCDString]
+		public string AccessCode { get; init; } = String.Empty;
 	}
 }

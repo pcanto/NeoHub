@@ -15,6 +15,7 @@ namespace NeoHub.Api.WebSocket
     public class PanelWebSocketHandler
     {
         private readonly IPartitionStatusService _partitionService;
+        private readonly IPanelCommandService _commandService;
         private readonly IITv2SessionManager _sessionManager;
         private readonly ISessionMonitor _sessionMonitor;
         private readonly ILogger<PanelWebSocketHandler> _logger;
@@ -22,11 +23,13 @@ namespace NeoHub.Api.WebSocket
 
         public PanelWebSocketHandler(
             IPartitionStatusService partitionService,
+            IPanelCommandService commandService,
             IITv2SessionManager sessionManager,
             ISessionMonitor sessionMonitor,
             ILogger<PanelWebSocketHandler> logger)
         {
             _partitionService = partitionService;
+            _commandService = commandService;
             _sessionManager = sessionManager;
             _sessionMonitor = sessionMonitor;
             _logger = logger;
@@ -195,8 +198,50 @@ namespace NeoHub.Api.WebSocket
 
         private async Task HandleArmCommandAsync(System.Net.WebSockets.WebSocket webSocket, string json, string type, string clientId)
         {
-            _logger.LogDebug("Client {ClientId} sent {Command} (not implemented)", clientId, type);
-            await SendErrorAsync(webSocket, $"Command '{type}' not yet implemented", clientId);
+            var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("session_id", out var sessionIdProp) ||
+                !root.TryGetProperty("partition_number", out var partitionProp))
+            {
+                await SendErrorAsync(webSocket, "Missing session_id or partition_number", clientId);
+                return;
+            }
+
+            var sessionId = sessionIdProp.GetString()!;
+            var partition = partitionProp.GetByte();
+            var code = root.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : null;
+
+            _logger.LogInformation("Client {ClientId} → {Command}: Session={SessionId}, Partition={Partition}",
+                clientId, type, sessionId, partition);
+
+            PanelCommandResult result;
+
+            if (type == "disarm")
+            {
+                if (string.IsNullOrEmpty(code))
+                {
+                    await SendErrorAsync(webSocket, "Access code is required to disarm", clientId);
+                    return;
+                }
+                result = await _commandService.DisarmAsync(sessionId, partition, code);
+            }
+            else
+            {
+                var mode = type switch
+                {
+                    "arm_away" => DSC.TLink.ITv2.Enumerations.ArmingMode.AwayArm,
+                    "arm_home" => DSC.TLink.ITv2.Enumerations.ArmingMode.StayArm,
+                    "arm_night" => DSC.TLink.ITv2.Enumerations.ArmingMode.NightArm,
+                    _ => DSC.TLink.ITv2.Enumerations.ArmingMode.AwayArm
+                };
+                result = await _commandService.ArmAsync(sessionId, partition, mode, code);
+            }
+
+            if (!result.Success)
+            {
+                await SendErrorAsync(webSocket, result.ErrorMessage ?? "Command failed", clientId);
+            }
         }
 
         private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -320,11 +365,18 @@ namespace NeoHub.Api.WebSocket
 
         private static string MapPartitionStatus(Services.Models.PartitionState partition)
         {
-            // TODO: Track actual armed state
             if (partition.IsArmed)
-                return "armed_away";
-            
-            return partition.IsReady ? "disarmed" : "disarmed";
+            {
+                return partition.ArmMode switch
+                {
+                    "Armed Away" or "Armed Away (No Entry Delay)" => "armed_away",
+                    "Armed Stay" or "Armed Stay (No Entry Delay)" => "armed_home",
+                    "Armed Night" or "Armed Night (No Entry Delay)" => "armed_night",
+                    _ => "armed_away"
+                };
+            }
+
+            return "disarmed";
         }
 
         private static string DetermineDeviceClass(Services.Models.ZoneState zone)

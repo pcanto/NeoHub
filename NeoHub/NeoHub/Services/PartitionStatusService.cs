@@ -34,6 +34,21 @@ namespace NeoHub.Services
             return _sessions.GetOrAdd(sessionId, id => new SessionState { SessionId = id });
         }
 
+        public void UpdateSession(string sessionId, Action<SessionState> update)
+        {
+            var session = GetOrCreateSession(sessionId);
+            update(session);
+            session.LastUpdated = DateTime.UtcNow;
+
+            _logger.LogDebug("Updated session {Session}", sessionId);
+
+            SessionStateChanged?.Invoke(this, new SessionStateChangedEventArgs
+            {
+                SessionId = sessionId,
+                Session = session
+            });
+        }
+
         #endregion
 
         #region Partition Operations

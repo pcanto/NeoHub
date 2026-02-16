@@ -58,6 +58,7 @@ namespace NeoHub
 
             // Application services
             builder.Services.AddSingleton<IPartitionStatusService, PartitionStatusService>();
+            builder.Services.AddSingleton<IPanelCommandService, PanelCommandService>();
             builder.Services.AddSingleton<ISessionMonitor, SessionMonitor>();
 
             // WebSocket API
